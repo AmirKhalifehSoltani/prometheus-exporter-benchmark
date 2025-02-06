@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Redis as RedisFacade;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Prometheus\CollectorRegistry;
@@ -15,24 +16,15 @@ class PrometheusExporterController extends Controller
      */
     public function exportWithRedis()
     {
-        // تنظیمات Redis Adapter
-        $redisAdapter = new Redis([
-            'host' => '127.0.0.1',
-            'port' => 6379,
-            'timeout' => 0.1, // زمان تایم‌اوت کوتاه برای Performance بهتر
-        ]);
+        // مقدار را در Redis افزایش می‌دهد (اتمیک)
+        $count = RedisFacade::incr('request_count');
 
-        // مقداردهی به CollectorRegistry با Redis
-        $registry = new CollectorRegistry($redisAdapter);
+        // خروجی داده‌ها در فرمت Prometheus
+        $metrics = "# HELP request_count_redis Number of requests stored in Redis\n";
+        $metrics .= "# TYPE request_count_redis counter\n";
+        $metrics .= "request_count_redis {$count}\n";
 
-        // ایجاد متریک برای Prometheus
-        $counter = $registry->getOrRegisterCounter('my_app', 'request_count_redis', 'Request Count from Redis');
-        $counter->inc();
-
-        // خروجی به فرمت متریک‌های Prometheus
-        $renderer = new RenderTextFormat();
-        return response($renderer->render($registry->getMetricFamilySamples()))
-            ->header('Content-Type', RenderTextFormat::MIME_TYPE);
+        return response($metrics)->header('Content-Type', 'text/plain');
     }
 
     /**
